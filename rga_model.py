@@ -58,7 +58,7 @@ class ResNet50_RGA_Model(nn.Module):
 	Backbone: ResNet-50 + RGA modules.
 	'''
 	def __init__(self, pretrained=True, num_feat=2048, height=256, width=128, 
-		dropout=0, num_classes=767, last_stride=1, branch_name='rgasc', scale=8, d_scale=8,
+		dropout=0, num_classes=0, last_stride=1, branch_name='rgasc', scale=8, d_scale=8,
 		model_path=WEIGHT_PATH):
 		super(ResNet50_RGA_Model, self).__init__()
 		self.pretrained = pretrained
@@ -137,7 +137,7 @@ class ResNet50_RGA_Model(nn.Module):
 				feat_[:, :, i * stripe_h_4: (i + 1) * stripe_h_4, :],
 				# 每一块是4*w【：，：，4，：】 分高度取特征块  [b，c，0：4.w]；[b，c，4：8.w]等等.  F.maxpool(input,kerner_size(h,w)) input=分割下来的每个特征段，（(stripe_h_6, feat.size(-1)）指的是最大池化的窗口大小。
 				(stripe_h_4, feat_.size(-1)))  # pool成1*1的
-			#print(local_4_feat.shape)  # 8 2048 1 1
+#			print(local_4_feat.shape)  # 8 2048 1 1
 
 			local_4_feat_list.append(local_4_feat)  # 按顺序得到每一块的特征，append函数是一个常用的方法，用于向列表、集合和字典等数据结构中添加元素
 		# ----------------------------------------------------------------------------
@@ -214,10 +214,14 @@ class ResNet50_RGA_Model(nn.Module):
 		rest_w3 = global_w4_max_feat - rest_w4_feat_3
 
 		rest_w_feat = (rest_w0 + rest_w1 + rest_w2 + rest_w3)
-		# -------------------------------------------------------------------------------
 		rest_w_feat_cat = self.conv_4_b(torch.cat((rest_w0, rest_w1, rest_w2, rest_w3), 3))
-		feat_ =rest_feat+ global_feat + rest_w_feat + global_w_feat+rest_w_feat_cat+rest_feat_cat+global_4_max_feat
-
+#global_4_max_feat, local_4_feat_all, local_4_feat_cat, global_feat, rest_feat #global_feat = local_4_feat_all - local_4_feat_cat
+		#feat_ = feat_+rest_feat + global_feat +rest_w_feat + global_w_feat       #feat_+rest_feat + global_feat +rest_w_feat + global_w_feat 300epoch,86.1 只有W，
+		#feat_ = feat_+global_w_feat + global_feat + global_4_max_feat #52.1, 52.6, 84.3
+		#feat_ = global_w4_max_feat + local_w4_feat_all + local_w4_feat_cat +rest_w_feat +feat_ #---------------58.2   59.6，80.7，87.6；
+		#feat_ = feat_ + global_w_feat + rest_w_feat + global_4_max_feat + local_w4_feat_cat
+		#feat_ = global_4_max_feat + global_feat + rest_feat+feat_ + local_4_feat_cat
+		feat_ = feat_ + rest_feat + global_feat + local_4_feat_cat
 #------------finish---------------------
 		feat_ = F.avg_pool2d(feat_, feat_.size()[2:]).view(feat_.size(0), -1) #（16，2048，8-16） pooling → （8，2048）
 		feat = self.feat_bn(feat_)
